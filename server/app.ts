@@ -21,7 +21,9 @@ const app = express();
 
 app.use(cors({
   origin: true,
-  credentials: true
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Visitor-Id', 'X-File-Name'],
+  exposedHeaders: ['X-Visitor-Id']
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '15mb' }));
@@ -59,19 +61,44 @@ app.get('/api/status', (req: Request, res: Response) => {
 const VISITOR_COOKIE = 'form_visitor_id';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function isSecureRequest(req: Request): boolean {
+  return req.secure || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production';
+}
+
+function getCookieOptions(req: Request, httpOnly = true) {
+  const isHttps = isSecureRequest(req);
+  const opts: any = {
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+    httpOnly,
+    sameSite: isHttps ? 'none' : 'lax',
+    secure: isHttps,
+    path: '/'
+  };
+  if (isHttps) {
+    opts.partitioned = true;
+  }
+  return opts;
+}
+
 function getOrCreateVisitorId(req: Request, res: Response): { visitorId: string; isNew: boolean } {
-  const existing = req.cookies?.[VISITOR_COOKIE];
-  if (typeof existing === 'string' && UUID_RE.test(existing)) {
-    return { visitorId: existing, isNew: false };
+  const fromHeader = req.headers['x-visitor-id'];
+  const fromCookie = req.cookies?.[VISITOR_COOKIE];
+  const fromBody = req.body?.visitorId;
+  const candidate = (typeof fromHeader === 'string' && UUID_RE.test(fromHeader)) ? fromHeader
+    : (typeof fromCookie === 'string' && UUID_RE.test(fromCookie)) ? fromCookie
+    : (typeof fromBody === 'string' && UUID_RE.test(fromBody)) ? fromBody
+    : null;
+
+  const cookieOpts = getCookieOptions(req, true);
+
+  if (candidate) {
+    res.cookie(VISITOR_COOKIE, candidate, cookieOpts);
+    res.setHeader('X-Visitor-Id', candidate);
+    return { visitorId: candidate, isNew: false };
   }
   const visitorId = randomUUID();
-  res.cookie(VISITOR_COOKIE, visitorId, {
-    maxAge: 365 * 24 * 60 * 60 * 1000,
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: req.secure || req.headers['x-forwarded-proto'] === 'https' || process.env.NODE_ENV === 'production',
-    path: '/'
-  });
+  res.cookie(VISITOR_COOKIE, visitorId, cookieOpts);
+  res.setHeader('X-Visitor-Id', visitorId);
   return { visitorId, isNew: true };
 }
 
@@ -119,11 +146,43 @@ app.post('/api/session/new', async (req: Request, res: Response) => {
 // Saves the complete current answers into the draft
 app.put('/api/session/:id', async (req: Request, res: Response) => {
   try {
-    const visitorId = req.cookies?.[VISITOR_COOKIE];
+    const fromHeader = req.headers['x-visitor-id'];
+    const fromCookie = req.cookies?.[VISITOR_COOKIE];
+    const fromBody = req.body?.visitorId;
+    let visitorId = (typeof fromHeader === 'string' && UUID_RE.test(fromHeader)) ? fromHeader
+      : (typeof fromCookie === 'string' && UUID_RE.test(fromCookie)) ? fromCookie
+      : (typeof fromBody === 'string' && UUID_RE.test(fromBody)) ? fromBody
+      : null;
+
     const { id } = req.params;
-    if (typeof visitorId !== 'string' || !UUID_RE.test(visitorId) || !UUID_RE.test(id)) {
+    if (!UUID_RE.test(id)) {
       return res.status(404).json({ success: false, message: 'Form session not found.' });
     }
+
+    const existing = await getSessionById(id);
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Form session not found.' });
+    }
+
+    if (existing.status === 'submitted') {
+      return res.status(409).json({ success: false, message: 'This form has already been submitted.' });
+    }
+
+    if (existing.status === 'abandoned') {
+      return res.status(404).json({ success: false, message: 'Form session not found.' });
+    }
+
+    // Security check: if another visitor explicitly provides a different visitor ID, reject
+    if (visitorId && existing.visitor_id !== visitorId) {
+      return res.status(404).json({ success: false, message: 'Form session not found.' });
+    }
+
+    // Adopt the session's visitorId if cookies/headers were stripped by browser/proxy
+    visitorId = visitorId || existing.visitor_id;
+
+    // Refresh cookie in response with modern iframe-compatible attributes
+    res.cookie(VISITOR_COOKIE, visitorId, getCookieOptions(req, true));
+    res.setHeader('X-Visitor-Id', visitorId);
 
     const { formData, currentStep, partyIndex, formType } = req.body || {};
     if (!formData || typeof formData !== 'object' || Array.isArray(formData)) {
@@ -141,10 +200,7 @@ app.put('/api/session/:id', async (req: Request, res: Response) => {
     });
 
     if (!saved) {
-      // Either not this visitor's session, or it has already been submitted
-      const existing = await getSessionById(id);
-      const status = existing && existing.visitor_id === visitorId ? 409 : 404;
-      return res.status(status).json({ success: false, message: status === 409 ? 'This form has already been submitted.' : 'Form session not found.' });
+      return res.status(404).json({ success: false, message: 'Form session not found.' });
     }
 
     touchVisitor(visitorId).catch(() => undefined);
@@ -275,11 +331,12 @@ app.post('/api/intake', async (req: Request, res: Response) => {
     const { visitorId, isNew } = getOrCreateVisitorId(req, res);
     if (isNew) await touchVisitor(visitorId, true);
     let linkedSessionId: string | null = null;
-    if (!isNew && typeof sessionId === 'string' && UUID_RE.test(sessionId)) {
-      const frozen = await markSessionSubmitted(sessionId, visitorId, formData);
+    if (typeof sessionId === 'string' && UUID_RE.test(sessionId)) {
+      const existing = await getSessionById(sessionId);
+      const effectiveVisitorId = existing?.visitor_id || visitorId;
+      const frozen = await markSessionSubmitted(sessionId, effectiveVisitorId, formData);
       if (!frozen) {
-        const existing = await getSessionById(sessionId);
-        if (existing?.visitor_id === visitorId && existing.status === 'submitted') {
+        if (existing?.status === 'submitted') {
           return res.status(409).json({ success: false, message: 'This form has already been submitted.' });
         }
       } else {
@@ -298,12 +355,7 @@ app.post('/api/intake', async (req: Request, res: Response) => {
     ].filter(Boolean).join(', ');
 
     // 1. Save Persistent Tracking Cookies in HTTP Response
-    const cookieOptions = {
-      maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
-      httpOnly: false, // Accessible to client scripts
-      sameSite: 'lax' as const,
-      path: '/'
-    };
+    const cookieOptions = getCookieOptions(req, false);
 
     // 2. Insert into Supabase `conveyancing_intakes`
     const intakeRecord = await saveIntakeToSupabase({

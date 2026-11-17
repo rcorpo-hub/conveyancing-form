@@ -470,11 +470,15 @@ export const ClientIntakeWizard: React.FC = () => {
     };
 
     try {
+      const visitorId = sync.getVisitorId() || undefined;
       const response = await fetch('/api/intake', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ formData: payload, telemetry, sessionId: sync.getSessionId() })
+        headers: {
+          'Content-Type': 'application/json',
+          ...(visitorId ? { 'X-Visitor-Id': visitorId } : {})
+        },
+        credentials: 'include',
+        body: JSON.stringify({ formData: payload, telemetry, sessionId: sync.getSessionId(), visitorId })
       });
       const data: SubmissionResponse = await response.json();
       if (!response.ok || !data.success) {

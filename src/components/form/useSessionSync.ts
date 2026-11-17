@@ -40,11 +40,34 @@ interface ServerSession {
   updatedAt: string;
 }
 
+const VISITOR_ID_KEY = 'form_visitor_id';
+
+export function getStoredVisitorId(): string | null {
+  try {
+    return localStorage.getItem(VISITOR_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredVisitorId(id: string): void {
+  try {
+    localStorage.setItem(VISITOR_ID_KEY, id);
+  } catch {
+    // ignore
+  }
+}
+
 async function fetchJson(url: string, init?: RequestInit) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 6000);
+  const visitorId = getStoredVisitorId();
+  const headers: Record<string, string> = {
+    ...(visitorId ? { 'X-Visitor-Id': visitorId } : {}),
+    ...(init?.headers as Record<string, string> || {})
+  };
   try {
-    const res = await fetch(url, { credentials: 'same-origin', signal: controller.signal, ...init });
+    const res = await fetch(url, { credentials: 'include', signal: controller.signal, ...init, headers });
     clearTimeout(timeoutId);
     let body: any = null;
     try {
@@ -90,6 +113,9 @@ export function useSessionSync(enabled: boolean) {
   const fetchSession = async (): Promise<ServerSession | null> => {
     const { ok, body } = await fetchJson('/api/session');
     if (!ok || !body?.session?.id) return null;
+    if (body.visitorId) {
+      setStoredVisitorId(body.visitorId);
+    }
     sessionIdRef.current = body.session.id;
     return body.session as ServerSession;
   };
@@ -120,7 +146,7 @@ export function useSessionSync(enabled: boolean) {
       const put = () => fetchJson(`/api/session/${encodeURIComponent(sessionIdRef.current!)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...snapshot, formType: snapshot.formData.role })
+        body: JSON.stringify({ ...snapshot, formType: snapshot.formData.role, visitorId: getStoredVisitorId() })
       });
 
       let result = await put();
@@ -253,11 +279,15 @@ export function useSessionSync(enabled: boolean) {
       bufferLocally(snapshot);
       if (!sessionIdRef.current || !navigator.onLine) return;
       try {
+        const visitorId = getStoredVisitorId();
         void fetch(`/api/session/${encodeURIComponent(sessionIdRef.current)}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...snapshot, formType: snapshot.formData.role }),
-          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(visitorId ? { 'X-Visitor-Id': visitorId } : {})
+          },
+          body: JSON.stringify({ ...snapshot, formType: snapshot.formData.role, visitorId }),
+          credentials: 'include',
           keepalive: true
         });
       } catch {
@@ -286,6 +316,7 @@ export function useSessionSync(enabled: boolean) {
     saveNow: flush,
     startNewSession,
     markSubmitted,
-    getSessionId: () => sessionIdRef.current
+    getSessionId: () => sessionIdRef.current,
+    getVisitorId: getStoredVisitorId
   };
 }

@@ -75,6 +75,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `/api/uploads?kind=${encodeURIComponent(kind)}`);
+    xhr.withCredentials = true;
+    try {
+      const vid = localStorage.getItem('form_visitor_id');
+      if (vid) xhr.setRequestHeader('X-Visitor-Id', vid);
+    } catch {
+      // ignore
+    }
     xhr.setRequestHeader('Content-Type', mimeType);
     xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
     xhr.upload.onprogress = e => {
