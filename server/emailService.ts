@@ -110,7 +110,6 @@ export function sendSentToLiveSignEmail(p: PersonEmailParams) {
   const body = `
     <p>Dear <strong>${esc(p.personName)}</strong>,</p>
     <p>Thank you — we have received your ${esc(p.role.toLowerCase())} form${p.propertyAddress ? ` for <strong>${esc(p.propertyAddress)}</strong>` : ''} and sent it to <strong>LiveSign</strong> to verify your identity.</p>
-    ${referenceBox(p.matterReference)}
     <p style="font-weight:700;margin-bottom:6px;">What to do next</p>
     <ol style="padding-left:20px;margin-top:0;">
       <li>Look for an email from <strong>LiveSign</strong> (check your junk folder too).</li>
@@ -119,7 +118,7 @@ export function sendSentToLiveSignEmail(p: PersonEmailParams) {
     </ol>`;
   return deliver(
     p.toEmail,
-    `Form received and sent to LiveSign for identity verification [${p.matterReference}]`,
+    'Form received and sent to LiveSign for identity verification',
     layout({ heading: 'Your form has been sent to LiveSign', intro: 'Next step: verify your identity', body })
   );
 }
@@ -129,11 +128,10 @@ export function sendReceivedEmail(p: PersonEmailParams) {
   const body = `
     <p>Dear <strong>${esc(p.personName)}</strong>,</p>
     <p>Thank you — we have received your ${esc(p.role.toLowerCase())} form${p.propertyAddress ? ` for <strong>${esc(p.propertyAddress)}</strong>` : ''}.</p>
-    ${referenceBox(p.matterReference)}
     <p>Your identity verification request is being sent to <strong>LiveSign</strong>. You will receive another email from us once it has been sent, and then an email from LiveSign with your verification link.</p>`;
   return deliver(
     p.toEmail,
-    `Form received [${p.matterReference}]`,
+    'Form received',
     layout({ heading: 'We have received your form', intro: 'Your identity verification link will follow shortly', body })
   );
 }
@@ -143,11 +141,10 @@ export function sendVerifiedEmail(p: PersonEmailParams) {
   const body = `
     <p>Dear <strong>${esc(p.personName)}</strong>,</p>
     <p>Good news — your identity has been <strong>successfully verified</strong> through LiveSign.</p>
-    ${referenceBox(p.matterReference)}
     <p>You do not need to do anything else for the identity check. Our conveyancing team will be in touch about the next steps for your ${esc(p.role.toLowerCase())}${p.propertyAddress ? ` of <strong>${esc(p.propertyAddress)}</strong>` : ''}.</p>`;
   return deliver(
     p.toEmail,
-    `You have been verified [${p.matterReference}]`,
+    'You have been verified',
     layout({ heading: 'Your identity is verified', intro: 'Thank you for completing your LiveSign check', body })
   );
 }

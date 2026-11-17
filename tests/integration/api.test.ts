@@ -196,8 +196,8 @@ describe('Submitting the form', () => {
     const b = browser();
     const { res } = await submitForm(b);
     const ref = res.body.matterReference;
-    assert.ok(subjectsTo(TEST_EMAILS.purchaser1).some(s => s.includes('sent to LiveSign') && s.includes(ref)), JSON.stringify(emailOutbox));
-    assert.ok(subjectsTo(TEST_EMAILS.purchaser2).some(s => s.includes('sent to LiveSign') && s.includes(ref)));
+    assert.ok(subjectsTo(TEST_EMAILS.purchaser1).some(s => s.includes('sent to LiveSign')), JSON.stringify(emailOutbox));
+    assert.ok(subjectsTo(TEST_EMAILS.purchaser2).some(s => s.includes('sent to LiveSign')));
     assert.ok(subjectsTo(TEST_EMAILS.firm).some(s => s.startsWith('New purchaser form') && s.includes(ref) && s.includes('sent to LiveSign')));
   });
 
