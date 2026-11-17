@@ -3,7 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { randomUUID } from 'crypto';
-import { saveIntakeToSupabase, saveAuditLogToSupabase, saveUploadedFile, isSupabaseConfigured, newMatterReference } from './supabaseClient.js';
+import { saveIntakeToSupabase, saveAuditLogToSupabase, saveUploadedFile, isSupabaseConfigured, newMatterReference, getNextMatterReference } from './supabaseClient.js';
 import { isEmailConfigured, notifyFirmNewSubmission, sendReceivedEmail } from './emailService.js';
 import { startVerification } from './verificationStore.js';
 import { firmSummary, handleLiveSignWebhook, sendIntakeToLiveSign } from './livesign/service.js';
@@ -287,8 +287,8 @@ app.post('/api/intake', async (req: Request, res: Response) => {
       }
     }
 
-    // Legal matter reference, e.g. RK-2026-XXXX (regenerated on the rare clash when saving)
-    let matterReference = newMatterReference();
+    // Legal matter reference, e.g. RK-2026-0001 (starts from 1 and increments sequentially)
+    let matterReference = await getNextMatterReference();
 
     const propertyAddress = [
       formData.property?.addressLine1,

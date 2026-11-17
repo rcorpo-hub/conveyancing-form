@@ -46,9 +46,55 @@ export function getSupabase(): SupabaseClient | null {
 const localIntakesFallback: any[] = [];
 const localAuditLogsFallback: any[] = [];
 
-/** Legal matter reference, e.g. RK-2026-4821. */
+/**
+ * Next sequential matter reference, e.g. RK-2026-0001, RK-2026-0002.
+ * Starts from 0001 for each year and increments sequentially.
+ */
+export async function getNextMatterReference(): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `RK-${year}-`;
+  const client = getSupabase();
+
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from('conveyancing_intakes')
+        .select('matter_reference')
+        .like('matter_reference', `${prefix}%`)
+        .order('matter_reference', { ascending: false })
+        .limit(20);
+
+      if (!error && data && data.length > 0) {
+        const seqNums = data
+          .map(r => parseInt(String(r.matter_reference || '').slice(prefix.length), 10))
+          .filter(n => !isNaN(n) && n > 0);
+
+        if (seqNums.length > 0) {
+          const maxNum = Math.max(...seqNums);
+          return `${prefix}${String(maxNum + 1).padStart(4, '0')}`;
+        }
+      }
+      return `${prefix}0001`;
+    } catch (err: any) {
+      console.warn('⚠️ [SUPABASE] Could not query latest matter reference:', err.message);
+    }
+  }
+
+  // Fallback for local in-memory store
+  return newMatterReference();
+}
+
+/** Synchronous matter reference generator starting from 0001. */
 export function newMatterReference(): string {
-  return `RK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const year = new Date().getFullYear();
+  const prefix = `RK-${year}-`;
+  const localNums = localIntakesFallback
+    .filter(i => typeof i.matter_reference === 'string' && i.matter_reference.startsWith(prefix))
+    .map(i => parseInt(i.matter_reference.slice(prefix.length), 10))
+    .filter(n => !isNaN(n) && n > 0);
+
+  const nextLocal = localNums.length > 0 ? Math.max(...localNums) + 1 : 1;
+  return `${prefix}${String(nextLocal).padStart(4, '0')}`;
 }
 
 export async function saveIntakeToSupabase(intake: {
@@ -91,7 +137,7 @@ export async function saveIntakeToSupabase(intake: {
         }
         // Reference already used by an earlier matter — draw a new one
         if (error.code === '23505' && String(error.message).includes('matter_reference')) {
-          row = { ...row, matter_reference: newMatterReference() };
+          row = { ...row, matter_reference: await getNextMatterReference() };
           continue;
         }
         // A session that only exists in the local fallback cannot be linked (or the

@@ -4,12 +4,11 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # ─── 1. ENVIRONMENT VARIABLES & SECRETS (STRICT NEVER-COMMIT) ─────────────────
-# Block all .env variations (.env, .env.production, .env.local, .env.staging, etc.)
+# Block all .env variations (.env, .env.production, .env.local, .env.example, etc.)
 .env
 .env.*
 *.env
 *.local
-!.env.example
 
 # Private certificates, SSH keys, credentials
 *.pem
