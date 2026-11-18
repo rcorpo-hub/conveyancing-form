@@ -24,18 +24,14 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ response, 
           : 'Your identity verification request is being sent to LiveSign.'}
       </p>
 
-      <dl className="rk-reference-card">
-        <div>
-          <dt>Your reference</dt>
-          <dd className="rk-reference">{response.matterReference}</dd>
-        </div>
-        {email && (
+      {email && (
+        <dl className="rk-reference-card">
           <div>
             <dt>Confirmation email</dt>
             <dd>{response.emailDispatched ? `Sent to ${email}` : `We will email ${email}`}</dd>
           </div>
-        )}
-      </dl>
+        </dl>
+      )}
 
       <div className="rk-done-columns">
         <div className="rk-next-steps rk-next-steps-card" role="region" aria-label="What happens next">
@@ -61,7 +57,7 @@ export const SubmissionSuccess: React.FC<SubmissionSuccessProps> = ({ response, 
             <li className="rk-step-item">
               <span className="rk-step-num" aria-hidden="true">3</span>
               <div className="rk-step-content">
-                <strong>We'll email you once you're verified.</strong> Keep your reference if you call us.
+                <strong>We'll email you once you're verified.</strong>
               </div>
             </li>
           </ol>

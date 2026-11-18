@@ -137,6 +137,8 @@ describe('Property, mortgage and payment validation', () => {
     assert.equal(validateProperty(f)['property.ownershipType'], undefined);
     f.property.ownershipType = 'Tenants in Common';
     assert.equal(validateProperty(f)['property.ownershipType'], undefined);
+    f.property.ownershipType = 'Not sure';
+    assert.equal(validateProperty(f)['property.ownershipType'], undefined);
   });
 
   test('TC-VAL-15 settlement date cannot be in the past', () => {

@@ -59,7 +59,7 @@ export const PreSubmitModal: React.FC<PreSubmitModalProps> = ({
               <li className="rk-step-item">
                 <span className="rk-step-num" aria-hidden="true">3</span>
                 <div className="rk-step-content">
-                  <strong>We'll email you once you're verified.</strong> Keep your reference if you call us.
+                  <strong>We'll email you once you're verified.</strong>
                 </div>
               </li>
             </ol>

@@ -134,15 +134,18 @@ export const PropertyStep: React.FC<PropertyStepProps> = ({
             required
             placeholder="Select ownership type"
             hint={formData.parties.length > 1
-              ? 'How multiple purchasers will hold the title (Joint Tenants or Tenants in Common).'
+              ? 'How multiple purchasers will hold the title (Joint Tenants, Tenants in Common, or Not sure).'
               : 'How the property title will be held.'}
             options={formData.parties.length > 1 ? [
               { value: 'Joint Tenants', label: 'Joint Tenants' },
-              { value: 'Tenants in Common', label: 'Tenants in Common' }
+              { value: 'Tenants in Common', label: 'Tenants in Common' },
+              { value: 'Sole Owner', label: 'Sole Owner' },
+              { value: 'Not sure', label: 'Not sure' }
             ] : [
               { value: 'Sole Owner', label: 'Sole Owner' },
               { value: 'Joint Tenants', label: 'Joint Tenants' },
-              { value: 'Tenants in Common', label: 'Tenants in Common' }
+              { value: 'Tenants in Common', label: 'Tenants in Common' },
+              { value: 'Not sure', label: 'Not sure' }
             ]}
             value={property.ownershipType}
             error={errors['property-ownershipType']}
