@@ -4,6 +4,7 @@ import {
   PropertyFormData, StampDutyFormData, SubmissionResponse, UploadedDocument
 } from '../types/index.js';
 import { SetupStep } from './SetupStep.js';
+import { scrollFormToTop } from '../utils/embed.js';
 import { SubmissionSuccess } from './SubmissionSuccess.js';
 import { getRememberedUser, saveUserIdentityCookies, collectClientTelemetry } from '../utils/tracker.js';
 import {
@@ -140,7 +141,8 @@ export const ClientIntakeWizard: React.FC = () => {
 
   // Start each screen at the top and move keyboard / screen-reader focus to its heading
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (pageChangedByUser.current) scrollFormToTop();
+    else window.scrollTo(0, 0);
     if (pageChangedByUser.current) headingRef.current?.focus({ preventScroll: true });
     pageChangedByUser.current = false;
   }, [step, partyIndex, screen?.id]);
@@ -411,7 +413,7 @@ export const ClientIntakeWizard: React.FC = () => {
     const declarationErrors = errorsForStep('review');
     setAttempted(a => ({ ...a, review: true }));
     if (reviewProblems.length > 0) {
-      window.scrollTo(0, 0);
+      scrollFormToTop();
       return;
     }
     if (Object.keys(declarationErrors).length) {
@@ -487,14 +489,14 @@ export const ClientIntakeWizard: React.FC = () => {
       sync.markSubmitted();
       setShowNextStepsModal(false);
       setSubmission({ response: data, formData: payload });
-      window.scrollTo(0, 0);
+      scrollFormToTop();
     } catch (err: any) {
       console.error('Submission error:', err);
       setSubmitError(navigator.onLine
         ? err.message || 'Something went wrong while sending the form.'
         : 'You appear to be offline.');
       setShowNextStepsModal(false);
-      window.scrollTo(0, 0);
+      scrollFormToTop();
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);

@@ -9,6 +9,9 @@ dotenv.config();
 
 const PORT = parseInt(process.env.PORT || '3005', 10);
 
+// A persistent Node server stays alive without a serverless lifecycle hook.
+app.locals.deferSubmission = (_work: Promise<unknown>) => {};
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 [RAIKAN CLIENT INTAKE SERVER] Running on http://localhost:${PORT}`);
   console.log(`   Supabase configured: ${isSupabaseConfigured() ? '✅ YES' : '⚠️ Pending .env keys'}`);

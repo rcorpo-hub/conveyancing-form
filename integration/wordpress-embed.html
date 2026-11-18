@@ -1,0 +1,57 @@
+<!-- Replace the existing Conveyancing Form iframe on /nc/ with this entire block.
+     The Vercel form must also be redeployed with the matching resize support. -->
+<style>
+  /* Scope theme overrides to the inspected WordPress page, including its mobile container. */
+  body.page-id-3577 #main { background: #fff; padding: 32px 0 48px; }
+  body.page-id-3577 #main > .container {
+    box-sizing: border-box;
+    width: calc(100% - 32px) !important;
+    max-width: 1100px;
+    min-width: 0;
+    margin: 0 auto;
+  }
+  #raikan-intake-wrapper { width: 100%; max-width: 880px; min-width: 0; margin: 0 auto; background: #fff; }
+  #raikan-intake-iframe {
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 600px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: #fff;
+  }
+</style>
+<div id="raikan-intake-wrapper">
+  <iframe
+    id="raikan-intake-iframe"
+    class="skip-lazy"
+    data-no-lazy="1"
+    src="https://conveyancing-form.vercel.app/"
+    title="Conveyancing Form"
+    loading="eager"
+    referrerpolicy="strict-origin-when-cross-origin"
+  ></iframe>
+</div>
+<script>
+  (() => {
+    const frame = document.getElementById('raikan-intake-iframe');
+    const origin = new URL(frame.src).origin;
+    window.addEventListener('message', event => {
+      if (event.origin !== origin || event.source !== frame.contentWindow) return;
+      const data = event.data;
+      if (data?.type === 'RAIKAN_FORM_RESIZE' && Number.isFinite(data.height) && data.height > 0) {
+        const height = Math.ceil(data.height);
+        if (frame.style.height !== height + 'px') frame.style.height = height + 'px';
+      }
+      if (data?.type === 'RAIKAN_FORM_SCROLL_TOP') {
+        const top = frame.getBoundingClientRect().top + window.scrollY - 24;
+        window.scrollTo({ top: Math.max(0, top), behavior: 'instant' });
+      }
+    });
+    const requestSize = () => frame.contentWindow.postMessage({ type: 'RAIKAN_FORM_REQUEST_SIZE' }, origin);
+    frame.addEventListener('load', requestSize);
+    requestSize();
+  })();
+</script>

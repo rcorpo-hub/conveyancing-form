@@ -80,6 +80,24 @@ async function webhook(envelopeId: string, token = 'test-webhook-secret') {
 }
 
 // ─── Saving answers (sessions) ───────────────────────────────────────────────
+test('host lifecycle hook receives notifications while submission returns pending', async () => {
+  let background: Promise<unknown> | undefined;
+  app.locals.deferSubmission = (work: Promise<unknown>) => { background = work; };
+  try {
+    const { res } = await submitForm(browser());
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.sentToLiveSign, false);
+    assert.equal(res.body.emailDispatched, false);
+    assert.ok(background, 'notifications registered with the host lifecycle');
+    await background;
+    assert.ok(subjectsTo(TEST_EMAILS.firm).length > 0, 'background notifications completed');
+  } finally {
+    await background;
+    delete app.locals.deferSubmission;
+  }
+});
+
 describe('Saving answers while typing', () => {
   test('TC-API-01 first visit sets an anonymous, httpOnly visitor cookie and creates a draft', async () => {
     const b = browser();

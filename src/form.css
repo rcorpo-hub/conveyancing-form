@@ -12,7 +12,7 @@
   --rk-text-body: #344359;
   --rk-muted: #5d6c81;
   --rk-muted-2: #536279;
-  --rk-page: #fbfcfe;
+  --rk-page: #ffffff;
   --rk-surface: #ffffff;
   --rk-line: #dce4ed;
   --rk-field-border: #7c96b7;        /* AA: 3:1 against white (preview used #bac8d9) */
@@ -46,7 +46,7 @@ html { scroll-behavior: smooth; }
 html[data-theme] body,
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 0;
   background: var(--rk-page);
   color: var(--rk-text);
   font-family: var(--rk-font);
@@ -60,6 +60,11 @@ body {
 :where(.rk-app) a { color: var(--rk-link); }
 .rk-app :where(h1, h2, h3) { margin: 0; color: var(--rk-text); }
 .rk-main { flex: 1; }
+/* Flex items must shrink to the WordPress iframe's actual content width. */
+#root, .rk-app, .rk-main, .rk-screen { min-width: 0; width: 100%; }
+.rk-input { min-width: 0; max-width: 100%; }
+.rk-phone-group .rk-input { flex: 1; width: 0; min-width: 0; }
+.rk-app { overflow-wrap: anywhere; }
 
 .rk-sr-only {
   position: absolute !important;
@@ -111,6 +116,7 @@ body {
 
 /* ─── Page: header, screen and buttons together fill the window ──────────── */
 .rk-app { min-height: 100vh; min-height: 100dvh; }
+html[data-embedded] body, html[data-embedded] .rk-app { min-height: 0; }
 .rk-main { display: flex; flex-direction: column; }
 .rk-form-page {
   flex: 1; display: flex; flex-direction: column;
@@ -1051,6 +1057,10 @@ input.rk-input[type='date'] { cursor: pointer; }
   .rk-menu-button { min-height: 34px; padding: 4px 13px; font-size: 13px; }
 
   .rk-form-page { padding: 8px 16px 0; }
+  .rk-progress-row { flex-wrap: wrap; gap: 2px 12px; }
+  .rk-progress-row > p { flex: none; }
+  .rk-matter-summary { flex-wrap: wrap; gap: 2px 8px; }
+  .rk-matter-summary button { flex: none; white-space: nowrap; }
   .rk-summary-divider { margin: 0 3px; }
   .rk-screen-head { margin-bottom: 12px; }
   .rk-screen-head h1, .rk-setup-question h1 { font-size: 22px; }

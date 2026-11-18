@@ -2,8 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App.js';
 import './index.css';
+import { connectEmbed } from './utils/embed.js';
 
 const root = document.getElementById('root') as HTMLElement;
+connectEmbed(root);
 try {
   ReactDOM.createRoot(root).render(
     <React.StrictMode>

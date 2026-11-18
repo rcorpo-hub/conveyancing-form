@@ -435,9 +435,13 @@ app.post('/api/intake', async (req: Request, res: Response) => {
       return null;
     });
 
-    // Wait for all of it (serverless hosts may stop work after the reply), up to 45 s. If LiveSign is even
-    // slower, the page says "being sent" and the emails still go out once the outcome is known.
-    const settled = await Promise.race([notifications, new Promise<null>(resolve => setTimeout(() => resolve(null), 45_000))]);
+    // Hosts register their lifecycle hook. Return once the intake is saved; LiveSign
+    // and SMTP must not hold up the confirmation screen. Direct app consumers without
+    // a lifecycle hook retain synchronous completion (including integration tests).
+    const defer = app.locals.deferSubmission as ((work: Promise<unknown>) => void) | undefined;
+    let settled: Awaited<typeof notifications> = null;
+    if (defer) defer(notifications);
+    else settled = await notifications;
     const outcome = settled?.outcome ?? 'pending';
     const emailSent = settled?.clientEmailed ?? false;
 

@@ -7,14 +7,14 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { TEST_EMAILS } from '../helpers/constants.js';
 import {
-  emailOutbox, isEmailConfigured, notifyFirmNewSubmission, sendReceivedEmail, sendSentToLiveSignEmail, sendVerifiedEmail
+  emailOutbox, isEmailConfigured, notifyFirmNewSubmission, sendReceivedEmail, sendSentToLiveSignEmail, sendVerifiedEmail, firmEmails
 } from '../../server/emailService.js';
 
-const enabled = process.env.LIVE_EMAIL_TEST === '1';
+const enabled = process.env.LIVE_EMAIL_TEST === '1' || process.env.npm_lifecycle_event === 'test:email';
 const REF = 'RK-TEST-0001';
 const base = { matterReference: REF, role: 'Purchaser', propertyAddress: '12 King William Street, Adelaide SA 5000' };
 
-describe('Live email delivery (real SMTP)', { skip: enabled ? false : 'set LIVE_EMAIL_TEST=1 (npm run test:email)' }, () => {
+describe('Live email delivery (real SMTP)', { skip: enabled ? false : 'set LIVE_EMAIL_TEST=1 in PowerShell: $env:LIVE_EMAIL_TEST="1"; npm run test:email' }, () => {
   test('TC-MAIL-01 SMTP settings are present', () => {
     assert.ok(isEmailConfigured(), 'SMTP_USER / SMTP_PASS missing in .env');
   });
@@ -42,8 +42,8 @@ describe('Live email delivery (real SMTP)', { skip: enabled ? false : 'set LIVE_
         { name: 'Vatsal Vachhani', email: TEST_EMAILS.purchaser2, mobile: '+91 98765 43210' }
       ]
     }, 'sent');
-    const firmMail = emailOutbox.filter(e => e.to === TEST_EMAILS.firm && e.subject.includes(REF));
-    assert.ok(firmMail.length > 0, 'FIRM_EMAIL is not the firm test address or no email was attempted');
+    const firmMail = emailOutbox.filter(e => (firmEmails.includes(e.to) || e.to === TEST_EMAILS.firm) && e.subject.includes(REF));
+    assert.ok(firmMail.length > 0, 'FIRM_EMAIL is not configured or no email was attempted');
     assert.ok(firmMail.every(e => e.delivered), 'SMTP refused the firm email');
   });
 });
