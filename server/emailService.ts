@@ -1,5 +1,8 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import type { ClientIntakeFormData } from '../src/types/index.js';
+import { renderFirmSubmissionEmail, type EmailAttachment } from './firmSubmissionEmail.js';
+import { readUploadedFile } from './supabaseClient.js';
 dotenv.config();
 
 const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
@@ -74,13 +77,15 @@ function record(to: string, subject: string, delivered: boolean) {
   if (emailOutbox.length > 200) emailOutbox.shift();
 }
 
-async function deliver(to: string, subject: string, html: string): Promise<{ sent: boolean; messageId?: string }> {
-  const result = await send(to, subject, html);
+type EmailExtras = { text?: string; attachments?: EmailAttachment[] };
+
+async function deliver(to: string, subject: string, html: string, extras: EmailExtras = {}): Promise<{ sent: boolean; messageId?: string }> {
+  const result = await send(to, subject, html, extras);
   record(to, subject, result.sent);
   return result;
 }
 
-async function send(to: string, subject: string, html: string): Promise<{ sent: boolean; messageId?: string }> {
+async function send(to: string, subject: string, html: string, extras: EmailExtras): Promise<{ sent: boolean; messageId?: string }> {
   const transporter = createTransporter();
   if (!transporter) {
     // SMTP not configured: show what would be sent, and report it as NOT sent
@@ -88,7 +93,7 @@ async function send(to: string, subject: string, html: string): Promise<{ sent: 
     return { sent: false };
   }
   try {
-    const info = await transporter.sendMail({ from: smtpFrom, to, subject, html });
+    const info = await transporter.sendMail({ from: smtpFrom, to, subject, html, ...extras });
     console.log(`📧 [EMAIL SENT] ${subject} → ${to}`);
     return { sent: true, messageId: info.messageId };
   } catch (err: any) {
@@ -156,8 +161,8 @@ export const firmEmails = (process.env.FIRM_EMAIL || '')
   .map(e => e.trim())
   .filter(e => EMAIL_RE.test(e));
 
-async function deliverToFirm(subject: string, html: string) {
-  for (const to of firmEmails) await deliver(to, subject, html);
+async function deliverToFirm(subject: string, html: string, extras: EmailExtras = {}) {
+  for (const to of firmEmails) await deliver(to, subject, html, extras);
 }
 
 function detailsTable(rows: Array<[string, string]>): string {
@@ -172,10 +177,37 @@ export interface FirmFormSummary {
   role: string;
   propertyAddress: string;
   people: Array<{ name: string; email: string; mobile: string }>;
+  submission?: { formData: ClientIntakeFormData; submittedAt: string };
 }
 
 /** New form submitted — with where it stands in LiveSign. */
-export function notifyFirmNewSubmission(form: FirmFormSummary, liveSign: 'sent' | 'pending' | 'error', detail?: string) {
+export async function notifyFirmNewSubmission(form: FirmFormSummary, liveSign: 'sent' | 'pending' | 'error', detail?: string) {
+  if (form.submission) {
+    const data = form.submission.formData;
+    const documents = [...(data.idDocuments || []), ...data.parties.flatMap(p => p.idDocuments || []), ...(data.finance.sourceOfFundsDocuments || [])];
+    const unique = documents.filter((document, index) => documents.findIndex(other => other.storagePath === document.storagePath) === index);
+    const files: EmailAttachment[] = [];
+    const unattachedFiles: string[] = [];
+    // Leave room for base64 encoding and the email body within common 25 MB SMTP limits.
+    let totalBytes = 0;
+    for (const document of unique) {
+      try {
+        const content = await readUploadedFile(document.storagePath);
+        if (totalBytes + content.length > 17 * 1024 * 1024) throw new Error('Email attachment limit reached.');
+        totalBytes += content.length;
+        files.push({ filename: document.fileName.replace(/[\r\n/\\]/g, '_'), content, contentType: document.mimeType });
+      } catch {
+        unattachedFiles.push(document.fileName);
+        console.error('[FIRM EMAIL] Could not attach uploaded document:', document.fileName);
+      }
+    }
+    const message = renderFirmSubmissionEmail({ ...form.submission, matterReference: form.matterReference, liveSign, detail, unattachedFiles });
+    return deliverToFirm(
+      `New ${form.role.toLowerCase()} form [${form.matterReference}] — ${message.clientName.replace(/[\r\n]+/g, ' ')} — ${liveSign === 'sent' ? 'sent to LiveSign' : liveSign === 'pending' ? 'LiveSign pending' : 'LiveSign error'}`,
+      message.html,
+      { text: message.text, attachments: [...message.attachments, ...files] }
+    );
+  }
   const status = liveSign === 'sent'
     ? 'Sent to LiveSign — waiting for each person to verify'
     : liveSign === 'pending'

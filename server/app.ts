@@ -428,7 +428,10 @@ app.post('/api/intake', async (req: Request, res: Response) => {
         const r = await sendReceivedEmail({ toEmail: clientEmail, personName: clientName, matterReference, role: formData.role, propertyAddress });
         clientEmailed = r.sent;
       }
-      await notifyFirmNewSubmission(firmSummary(verificationIntake), outcome, outcome === 'error' ? 'See livesign_error on this intake in Supabase.' : undefined);
+      await notifyFirmNewSubmission({
+        ...firmSummary(verificationIntake),
+        submission: { formData, submittedAt: intakeRecord.created_at || new Date().toISOString() }
+      }, outcome, outcome === 'error' ? 'See livesign_error on this intake in Supabase.' : undefined);
       return { outcome, clientEmailed };
     }).catch(err => {
       console.error('❌ [SUBMISSION EMAILS]:', err);

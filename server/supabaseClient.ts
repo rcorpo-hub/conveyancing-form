@@ -210,6 +210,26 @@ export async function saveAuditLogToSupabase(log: {
 const storageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'intake-documents';
 const localUploadDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'uploads');
 
+/** Read only files created by our upload endpoint, never arbitrary URLs or disk paths. */
+export async function readUploadedFile(storagePath: string): Promise<Buffer> {
+  const match = /^(local:|supabase:([^/]+)\/)(\d{4}\/\d{2}\/[0-9a-f-]{36}\.(?:pdf|jpg|png))$/i.exec(storagePath || '');
+  if (!match) throw new Error('Invalid uploaded file path.');
+  const key = match[3];
+  let content: Buffer;
+  if (match[1] === 'local:') {
+    content = await fs.readFile(path.join(localUploadDir, key));
+  } else {
+    if (match[2] !== storageBucket) throw new Error('Unknown upload bucket.');
+    const client = getSupabase();
+    if (!client) throw new Error('Document storage is unavailable.');
+    const { data, error } = await client.storage.from(storageBucket).download(key);
+    if (error || !data) throw new Error('Could not read uploaded document.');
+    content = Buffer.from(await data.arrayBuffer());
+  }
+  if (content.length > 5 * 1024 * 1024) throw new Error('Document exceeds the upload limit.');
+  return content;
+}
+
 /** Stores an uploaded file and returns a storage path of the form `supabase:<bucket>/<key>` or `local:<key>`. */
 export async function saveUploadedFile(key: string, data: Buffer, contentType: string): Promise<string> {
   const client = getSupabase();
